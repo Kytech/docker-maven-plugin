@@ -115,6 +115,30 @@ class DockerFileUtilTest {
     }
 
     @Test
+    void testImagesOfCopyFromAndRunMountAreIncluded() throws Exception {
+        File toTest = copyToTempDir("Dockerfile_stage_source_images");
+        List<String> images = DockerFileUtil.extractBaseImages(
+            toTest, FixedStringSearchInterpolator.create(), Collections.emptyMap());
+
+        Assertions.assertEquals(Arrays.asList(
+            // FROM
+            "alpine:3.20", "scratch",
+            // COPY --from and RUN --mount from, in the order of their appearance, without stages, comments and here-documents
+            "ghcr.io/org/tool:v1", "registry.example.com/tools:1.2", "docker.io/library/busybox:1", "after/the-shell-syntax"),
+            images);
+    }
+
+    @Test
+    void testImageOfCopyFromUsesBuildArgOfBuildConfig() throws Exception {
+        File toTest = copyToTempDir("Dockerfile_stage_source_images");
+        List<String> images = DockerFileUtil.extractBaseImages(
+            toTest, FixedStringSearchInterpolator.create(), Collections.singletonMap("TOOLS_IMAGE", "other.example.com/tools:2"));
+
+        Assertions.assertTrue(images.contains("other.example.com/tools:2"));
+        Assertions.assertFalse(images.contains("registry.example.com/tools:1.2"));
+    }
+
+    @Test
     void testMultiStageRepeatedArgKeepsDefault() throws Exception {
         File toTest = copyToTempDir("Dockerfile_multi_stage_repeated_arg_default");
         List<String> fromClauses = DockerFileUtil.extractBaseImages(

@@ -1,0 +1,28 @@
+# syntax=docker/dockerfile:1
+# Dockerfile with COPY --from and RUN --mount from referring to images and to stages
+ARG TOOLS_IMAGE=registry.example.com/tools:1.2
+
+FROM --platform=linux/amd64 alpine:3.20 AS Builder
+RUN echo built > /out
+
+FROM scratch AS assets
+# Stage by name (case insensitive) and by index
+COPY --from=builder /out /out
+COPY --from=0 /out /out0
+
+FROM alpine:3.20
+COPY --from=builder /out /app/out
+COPY --chown=1000:1000 --from=ghcr.io/org/tool:v1 /tool /usr/bin/tool
+COPY --from=${TOOLS_IMAGE} /t /t
+COPY --from=$UNRESOLVED /u /u
+# A comment: COPY --from=in/a-comment /c /c
+RUN --mount=type=bind,from=docker.io/library/busybox:1,source=/bin,target=/b \
+    ls /b
+RUN --mount=type=cache,target=/root/.cache --mount=type=bind,source=.,target=/src,from=assets ls /src
+RUN echo "COPY --from=not/an-instruction /a /b"
+RUN --mount=type=bind,from=docker.io/library/busybox:1,target=/again ls /again
+RUN cat <<EOF > /etc/example
+COPY --from=in/a-heredoc /a /b
+EOF
+RUN echo $((1<<3)) <<< "shell syntax which is no heredoc"
+COPY --from=after/the-shell-syntax /a /b

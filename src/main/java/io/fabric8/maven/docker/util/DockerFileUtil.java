@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -53,6 +54,10 @@ public class DockerFileUtil {
      * Extract the base images from a dockerfile. All lines containing a <code>FROM</code> is
      * taken.
      *
+     * Besides the images of the {@code FROM} instructions, also the images which other instructions take files
+     * from are returned: {@code COPY --from=<image>} and {@code RUN --mount=...,from=<image>}. A reference to
+     * a build stage (by its name or its index) is not an image and is skipped.
+     *
      * @param dockerFile file from where to extract the base image
      * @param interpolator interpolator for replacing properties
      * @return LinkedList of base images name or empty collection if none is found.
@@ -62,7 +67,9 @@ public class DockerFileUtil {
         Map<String, String> args = extractArgs(dockerFile, argsFromBuildConfig, interpolator);
         Set<String> result = new LinkedHashSet<>();
         Set<String> fromAlias = new HashSet<>();
+        Set<String> stageNames = new HashSet<>();
         for (String[] fromLine :  fromLines) {
+            addStageName(stageNames, fromLine, args);
             if (fromLine.length > 1) {
                 String from = extractValidFromLine(fromLine);
                 if (!fromAlias.contains(from)) {
@@ -75,7 +82,115 @@ public class DockerFileUtil {
                 }
             }
         }
+        for (String reference : extractStageSourceReferences(dockerFile, interpolator)) {
+            String image = resolveImageTagFromArgs(reference, args);
+            if (isExternalImage(image, stageNames)) {
+                result.add(image);
+            }
+        }
         return new ArrayList<>(result);
+    }
+
+    // The name of a stage is given with "FROM [--flags] image AS name". Docker handles stage names case insensitive.
+    private static void addStageName(Set<String> stageNames, String[] fromLine, Map<String, String> args) {
+        for (int i = 1; i < fromLine.length - 1; i++) {
+            if (fromLine[i].equalsIgnoreCase("AS")) {
+                stageNames.add(resolveImageTagFromArgs(fromLine[i + 1], args).toLowerCase(Locale.ROOT));
+                return;
+            }
+        }
+    }
+
+    private static boolean isExternalImage(String reference, Set<String> stageNames) {
+        return !reference.isEmpty()
+            // Index of a stage
+            && !reference.chars().allMatch(Character::isDigit)
+            && !stageNames.contains(reference.toLowerCase(Locale.ROOT))
+            // Can't be pulled
+            && !reference.contains("$");
+    }
+
+    // Start of a here-document ("<<EOF", "<<-EOF", "<<'EOF'"), but not a here-string ("<<<")
+    private static final Pattern HEREDOC_PATTERN = Pattern.compile("(?<!<)<<-?\\s*[\"']?([\\w.-]+)[\"']?");
+
+    /**
+     * Get what the {@code COPY --from=...} and the {@code RUN --mount=...,from=...} flags of a Dockerfile refer to.
+     * This is an image or a build stage.
+     */
+    private static List<String> extractStageSourceReferences(File dockerFile, FixedStringSearchInterpolator interpolator) throws IOException {
+        List<String> references = new ArrayList<>();
+        for (String instruction : readInstructions(dockerFile, interpolator)) {
+            String[] parts = instruction.split("\\s+");
+            boolean isCopy = parts[0].equalsIgnoreCase("COPY");
+            boolean isRun = parts[0].equalsIgnoreCase("RUN");
+            if (!isCopy && !isRun) {
+                continue;
+            }
+            // Flags come right after the instruction
+            for (int i = 1; i < parts.length && parts[i].startsWith("--"); i++) {
+                if (isCopy && parts[i].startsWith("--from=")) {
+                    references.add(parts[i].substring("--from=".length()));
+                } else if (isRun && parts[i].startsWith("--mount=")) {
+                    for (String option : parts[i].substring("--mount=".length()).split(",")) {
+                        if (option.startsWith("from=")) {
+                            references.add(option.substring("from=".length()));
+                        }
+                    }
+                }
+            }
+        }
+        return references;
+    }
+
+    /**
+     * Read the instructions of a Dockerfile: comments are left out, instructions continued on the next line
+     * with a backslash are joined, and the content of here-documents isn't taken as instructions.
+     */
+    private static List<String> readInstructions(File dockerFile, FixedStringSearchInterpolator interpolator) throws IOException {
+        List<String> lines = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader(dockerFile))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                lines.add(interpolator.interpolate(line));
+            }
+        }
+
+        List<String> instructions = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        for (int i = 0; i < lines.size(); i++) {
+            String trimmed = lines.get(i).trim();
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                continue;
+            }
+            boolean continued = trimmed.endsWith("\\");
+            current.append(continued ? trimmed.substring(0, trimmed.length() - 1) : trimmed).append(' ');
+            if (continued) {
+                continue;
+            }
+            String instruction = current.toString().trim();
+            current.setLength(0);
+            instructions.add(instruction);
+
+            Matcher heredoc = HEREDOC_PATTERN.matcher(instruction);
+            while (heredoc.find()) {
+                i = skipHereDocument(lines, i, heredoc.group(1));
+            }
+        }
+        if (current.length() > 0) {
+            instructions.add(current.toString().trim());
+        }
+        return instructions;
+    }
+
+    // Returns the index of the line which ends the here-document. If there is no such line, what looked like
+    // the start of a here-document isn't one (e.g. a shift in a shell expression) and nothing is skipped.
+    private static int skipHereDocument(List<String> lines, int startIndex, String delimiter) {
+        for (int i = startIndex + 1; i < lines.size(); i++) {
+            if (lines.get(i).trim().equals(delimiter)) {
+                return i;
+            }
+        }
+        return startIndex;
     }
 
     private static String extractValidFromLine(String[] fromLine) {

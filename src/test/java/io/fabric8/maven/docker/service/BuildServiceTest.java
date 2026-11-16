@@ -228,6 +228,42 @@ class BuildServiceTest {
     }
 
     @Test
+    void testDockerfileWithFrom_ShouldPullImagesOfTheDockerfileOnly() throws Exception {
+        // <from> is not used when a Dockerfile is given, so it must not be what is pulled
+        BuildImageConfiguration buildConfig = new BuildImageConfiguration.Builder()
+            .dockerFile(getClass().getResource("/io/fabric8/maven/docker/util/Dockerfile_stage_source_images").getPath())
+            .from("not/used:1")
+            .build();
+        buildConfig.initAndValidate(logger);
+
+        imageConfig = new ImageConfiguration.Builder()
+            .name("build-image")
+            .buildConfig(buildConfig)
+            .build();
+
+        final ImagePullManager pullManager = new ImagePullManager(null, null, null);
+        final BuildService.BuildContext buildContext = new BuildService.BuildContext.Builder()
+            .mojoParameters(mojoParameters)
+            .build();
+
+        Mockito.when(mojoParameters.getSession()).thenReturn(mavenSession);
+        mockMavenProject();
+
+        File buildArchive = buildService.buildArchive(imageConfig, buildContext, "");
+        buildService.buildImage(imageConfig, pullManager, buildContext, buildArchive);
+
+        // The base image, and the images which are copied from or mounted from
+        verifyImagePull(buildConfig, pullManager, buildContext, "alpine:3.20");
+        verifyImagePull(buildConfig, pullManager, buildContext, "ghcr.io/org/tool:v1");
+        verifyImagePull(buildConfig, pullManager, buildContext, "docker.io/library/busybox:1");
+        Mockito.verify(registryService, Mockito.never())
+            .pullImageWithPolicy(Mockito.eq("not/used:1"), Mockito.any(), Mockito.any(), Mockito.any());
+        // Not an image but a stage
+        Mockito.verify(registryService, Mockito.never())
+            .pullImageWithPolicy(Mockito.eq("builder"), Mockito.any(), Mockito.any(), Mockito.any());
+    }
+
+    @Test
     void testRelativeDockerfile_ShouldPullImage() throws Exception {
         final BuildImageConfiguration buildConfig = new BuildImageConfiguration.Builder()
             .cleanup("false")
@@ -484,16 +520,20 @@ class BuildServiceTest {
 
     @Test
     void testSquashWithBuildKitWarns() throws Exception {
-        buildWith(new BuildImageConfiguration.Builder().buildkit("true"), true);
+        Logger buildLog = Mockito.mock(Logger.class);
+        buildWith(new BuildService(docker, queryService, registryService, archiveService, buildLog),
+                  new BuildImageConfiguration.Builder().buildkit("true"), true);
 
-        Mockito.verify(log).warn(Mockito.contains("Squashing"));
+        Mockito.verify(buildLog).warn(Mockito.contains("Squashing"));
     }
 
     @Test
     void testSquashWithoutBuildKitDoesNotWarn() throws Exception {
-        buildWith(new BuildImageConfiguration.Builder(), true);
+        Logger buildLog = Mockito.mock(Logger.class);
+        buildWith(new BuildService(docker, queryService, registryService, archiveService, buildLog),
+                  new BuildImageConfiguration.Builder(), true);
 
-        Mockito.verify(log, Mockito.never()).warn(Mockito.contains("Squashing"));
+        Mockito.verify(buildLog, Mockito.never()).warn(Mockito.contains("Squashing"));
     }
 
     @Test
@@ -632,6 +672,10 @@ class BuildServiceTest {
     }
 
     private void buildWith(BuildImageConfiguration.Builder buildConfig, boolean squash) throws DockerAccessException, MojoExecutionException {
+        buildWith(buildService, buildConfig, squash);
+    }
+
+    private void buildWith(BuildService service, BuildImageConfiguration.Builder buildConfig, boolean squash) throws DockerAccessException, MojoExecutionException {
         imageConfig = new ImageConfiguration.Builder()
             .name("build-image")
             .buildConfig(buildConfig.build())
@@ -640,9 +684,9 @@ class BuildServiceTest {
         BuildService.BuildContext buildContext = new BuildService.BuildContext.Builder()
             .mojoParameters(mojoParameters)
             .build();
-        File buildArchive = buildService.buildArchive(imageConfig, buildContext, "");
+        File buildArchive = service.buildArchive(imageConfig, buildContext, "");
 
-        buildService.buildImage(imageConfig, null, false, squash, Collections.emptyMap(), buildArchive);
+        service.buildImage(imageConfig, null, false, squash, Collections.emptyMap(), buildArchive);
     }
 
     private void whenBuildImage(boolean cleanup, boolean nocache) throws DockerAccessException, MojoExecutionException {
