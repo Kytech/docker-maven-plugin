@@ -23,7 +23,6 @@ import io.fabric8.maven.docker.util.Logger;
 import org.codehaus.plexus.archiver.ArchiveEntry;
 import org.codehaus.plexus.archiver.ResourceIterator;
 import org.codehaus.plexus.archiver.tar.TarArchiver;
-import org.codehaus.plexus.archiver.tar.TarLongFileMode;
 import org.codehaus.plexus.components.io.resources.PlexusIoResource;
 import org.codehaus.plexus.util.StringUtils;
 
@@ -49,7 +48,7 @@ class AllFilesExecCustomizer implements ArchiverCustomizer {
 
         TarArchiver newArchiver = new TarArchiver();
         newArchiver.setDestFile(archiver.getDestFile());
-        newArchiver.setLongfile(TarLongFileMode.posix);
+        newArchiver.setLongfile(DockerAssemblyManager.BUILD_CONTEXT_LONG_FILE_MODE);
 
         ResourceIterator resources = archiver.getResources();
         while (resources.hasNext()) {

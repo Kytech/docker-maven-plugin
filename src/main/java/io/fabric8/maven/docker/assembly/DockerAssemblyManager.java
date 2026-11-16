@@ -71,6 +71,12 @@ public class DockerAssemblyManager {
 
     private static final String TAR_ARCHIVER_TYPE = "tar";
 
+    // Long file mode for the archive holding the build context sent to the Docker daemon. The POSIX mode must not be
+    // used: it makes the archiver prefix entries having a sub-second modification time with a PAX extended header,
+    // and the daemon's BuildKit builder (build API version=2) then fails to find the Dockerfile in the archive
+    // ("unknown instruction: ./PaxHeaders.X/..."). The GNU mode is read by the classic and the BuildKit builder alike.
+    static final TarLongFileMode BUILD_CONTEXT_LONG_FILE_MODE = TarLongFileMode.gnu;
+
     @Inject
     private AssemblyArchiver assemblyArchiver;
 
@@ -448,7 +454,7 @@ public class DockerAssemblyManager {
 
     private TarArchiver createBuildArchiver(File outputDir, File archive, List<AssemblyConfiguration> assemblyConfigs) throws NoSuchArchiverException {
         TarArchiver archiver = (TarArchiver) archiverManager.getArchiver(TAR_ARCHIVER_TYPE);
-        archiver.setLongfile(TarLongFileMode.posix);
+        archiver.setLongfile(BUILD_CONTEXT_LONG_FILE_MODE);
 
         boolean needsDefaultFileSet = assemblyConfigs.isEmpty();
 

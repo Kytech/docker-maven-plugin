@@ -27,6 +27,7 @@ import org.codehaus.plexus.archiver.ResourceIterator;
 import org.codehaus.plexus.archiver.manager.ArchiverManager;
 import org.codehaus.plexus.archiver.manager.NoSuchArchiverException;
 import org.codehaus.plexus.archiver.tar.TarArchiver;
+import org.codehaus.plexus.archiver.tar.TarLongFileMode;
 import org.codehaus.plexus.components.io.resources.PlexusIoResource;
 import org.codehaus.plexus.interpolation.fixed.FixedStringSearchInterpolator;
 import org.codehaus.plexus.util.ReflectionUtils;
@@ -305,6 +306,27 @@ class DockerAssemblyManagerTest {
         Assertions.assertNotNull(tarArchive);
 
         verifyArchiveManager();
+    }
+
+    @Test
+    void testBuildContextArchiverDoesNotUsePosixLongFileMode() throws MojoExecutionException, NoSuchArchiverException {
+        MojoParameters mojoParams = mockMojoParams(mockMavenProject());
+
+        BuildImageConfiguration buildImageConfiguration = new BuildImageConfiguration.Builder()
+            .dockerFile(DockerAssemblyManagerTest.class.getResource("/docker/Dockerfile.test").getPath())
+            .assembly(new AssemblyConfiguration.Builder()
+                .mode(AssemblyMode.dir.name())
+                .build()
+            )
+            .build();
+        buildImageConfiguration.initAndValidate(logger);
+
+        Mockito.doReturn(tarArchiver).when(archiverManager).getArchiver("tar");
+        assemblyManager.createDockerTarArchive("test_image", mojoParams, buildImageConfiguration, logger, null);
+
+        // POSIX mode adds PAX headers for sub-second mtimes, which BuildKit can't handle (see BuildContextTarFormatTest)
+        Mockito.verify(tarArchiver).setLongfile(DockerAssemblyManager.BUILD_CONTEXT_LONG_FILE_MODE);
+        Assertions.assertNotEquals(TarLongFileMode.posix, DockerAssemblyManager.BUILD_CONTEXT_LONG_FILE_MODE);
     }
 
     @Test
