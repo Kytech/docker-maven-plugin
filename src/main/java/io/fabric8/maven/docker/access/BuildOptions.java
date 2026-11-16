@@ -44,6 +44,19 @@ public class BuildOptions {
         return this;
     }
 
+    /**
+     * Select the builder: {@code "1"} for the classic builder, {@code "2"} for BuildKit.
+     *
+     * @param version the builder version, or null to leave the choice to the daemon
+     * @return this
+     */
+    public BuildOptions version(String version) {
+        if (version != null) {
+            options.put("version", version);
+        }
+        return this;
+    }
+
     public BuildOptions dockerfile(String name) {
         if (name != null) {
             options.put("dockerfile", name);

@@ -43,6 +43,15 @@ public interface DockerAccess {
     String getServerApiVersion() throws DockerAccessException;
 
     /**
+     * Get the builder which the daemon uses by default for builds sent through its build API.
+     *
+     * @return {@code "2"} if the default is BuildKit, {@code "1"} for the classic builder (which is also what a daemon
+     *         not advertising a builder version, like older Docker versions or Podman, is assumed to use)
+     * @throws DockerAccessException if the daemon could not be asked
+     */
+    String getBuilderVersion() throws DockerAccessException;
+
+    /**
      * Get the native platform
      * @return The platform os/arch
      */

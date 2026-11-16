@@ -79,6 +79,10 @@ public final class UrlBuilder {
         return String.format("%s/version", baseUrl);
     }
 
+    public String ping() {
+        return String.format("%s/_ping", baseUrl);
+    }
+
     public String deleteImage(String name, boolean force) {
         return u("images/%s", name)
                 .p("force", force)

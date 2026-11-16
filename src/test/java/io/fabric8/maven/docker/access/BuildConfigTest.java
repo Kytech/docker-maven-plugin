@@ -53,6 +53,17 @@ class BuildConfigTest {
     }
 
     @Test
+    void version() {
+        BuildOptions opts = new BuildOptions().version("2");
+        Assertions.assertEquals(1, opts.getOptions().size());
+        Assertions.assertEquals("2", opts.getOptions().get("version"));
+        // No version leaves what is there
+        opts.version(null);
+        Assertions.assertEquals("2", opts.getOptions().get("version"));
+        Assertions.assertTrue(new BuildOptions().version(null).getOptions().isEmpty());
+    }
+
+    @Test
     void squash() {
         BuildOptions opts = new BuildOptions().squash(true);
         Assertions.assertEquals(1, opts.getOptions().size());

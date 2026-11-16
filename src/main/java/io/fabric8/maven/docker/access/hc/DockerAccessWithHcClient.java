@@ -19,6 +19,7 @@ import javax.annotation.Nullable;
 
 import io.fabric8.maven.docker.access.CreateImageOptions;
 import org.apache.commons.io.IOUtils;
+import org.apache.http.Header;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpResponseException;
 import org.apache.http.client.ResponseHandler;
@@ -98,6 +99,10 @@ public class DockerAccessWithHcClient implements DockerAccess {
     // Base URL which is given through when using wslc (WSL Containers) communication but is not really used
     private static final String WSLC_URL = "wslc://127.0.0.1:1/";
 
+    // Header of the response to /_ping which tells the builder used by default ("1": classic, "2": BuildKit)
+    private static final String BUILDER_VERSION_HEADER = "Builder-Version";
+    private static final String CLASSIC_BUILDER_VERSION = "1";
+
     // Minimal API version, independent of any feature used
     public static final String API_VERSION = "1.18";
 
@@ -117,6 +122,8 @@ public class DockerAccessWithHcClient implements DockerAccess {
     private final ApacheHttpClientDelegate delegate;
     private final String apiVersion;
     private final String nativePlatform;
+    // Lazily obtained
+    private volatile String builderVersion;
     private final UrlBuilder urlBuilder;
 
     /**
@@ -171,6 +178,24 @@ public class DockerAccessWithHcClient implements DockerAccess {
     @Override
     public String getServerApiVersion() {
         return apiVersion;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getBuilderVersion() throws DockerAccessException {
+        if (builderVersion == null) {
+            String url = urlBuilder.ping();
+            log.verbose(Logger.LogVerboseCategory.API, API_LOG_FORMAT_GET, url);
+            try {
+                builderVersion = delegate.get(url, response -> {
+                    Header header = response.getFirstHeader(BUILDER_VERSION_HEADER);
+                    return header != null && header.getValue() != null ? header.getValue().trim() : CLASSIC_BUILDER_VERSION;
+                }, HTTP_OK);
+            } catch (IOException e) {
+                throw new DockerAccessException(e, "Unable to query the builder version of the Docker daemon");
+            }
+        }
+        return builderVersion;
     }
 
     @Override

@@ -17,6 +17,7 @@ import org.apache.http.client.HttpResponseException;
 import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.message.BasicHeader;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -151,6 +152,43 @@ class DockerAccessWithHcClientTest {
         whenListContainers();
         thenNoException();
         thenContainerIdImagePairsMatch(Pair.of(containerId1.substring(0, 12), "image:tag"), Pair.of(containerId2.substring(0, 12), "image:tag"));
+    }
+
+    @Test
+    void testBuilderVersionOfBuildKitDaemon() throws Exception {
+        givenPingReturnsBuilderVersion("2");
+        Assertions.assertEquals("2", client.getBuilderVersion());
+    }
+
+    @Test
+    void testBuilderVersionOfDaemonNotAdvertisingOne() throws Exception {
+        givenPingReturnsBuilderVersion(null);
+        Assertions.assertEquals("1", client.getBuilderVersion());
+    }
+
+    @Test
+    void testBuilderVersionIsQueriedOnlyOnce() throws Exception {
+        givenPingReturnsBuilderVersion("2");
+        client.getBuilderVersion();
+        client.getBuilderVersion();
+        Mockito.verify(mockDelegate, Mockito.times(1))
+            .get(Mockito.eq(BASE_URL + "/_ping"), Mockito.<ResponseHandler<String>>any(), Mockito.eq(HTTP_OK));
+    }
+
+    @Test
+    void testBuilderVersionFails() throws Exception {
+        Mockito.doThrow(new IOException("no ping"))
+            .when(mockDelegate).get(Mockito.eq(BASE_URL + "/_ping"), Mockito.<ResponseHandler<String>>any(), Mockito.eq(HTTP_OK));
+        Assertions.assertThrows(DockerAccessException.class, () -> client.getBuilderVersion());
+    }
+
+    @SuppressWarnings("unchecked")
+    private void givenPingReturnsBuilderVersion(String builderVersion) throws IOException {
+        if (builderVersion != null) {
+            Mockito.doReturn(new BasicHeader("Builder-Version", builderVersion)).when(mockedResponse).getFirstHeader("Builder-Version");
+        }
+        Mockito.doAnswer(invocation -> ((ResponseHandler<String>) invocation.getArgument(1)).handleResponse(mockedResponse))
+            .when(mockDelegate).get(Mockito.eq(BASE_URL + "/_ping"), Mockito.<ResponseHandler<String>>any(), Mockito.eq(HTTP_OK));
     }
 
     @Test

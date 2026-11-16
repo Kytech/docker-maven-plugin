@@ -35,6 +35,12 @@ import org.junit.jupiter.api.Test;
 class UrlBuilderTest {
 
     @Test
+    void ping() {
+        // Like the version, the ping is not prefixed with the API version
+        Assertions.assertEquals("http://localhost:2375/_ping", new UrlBuilder("http://localhost:2375", "1.0").ping());
+    }
+
+    @Test
     void buildImage() throws URISyntaxException {
         UrlBuilder builder = new UrlBuilder("", "1.0");
         Assertions.assertEquals(new URI("/1.0/build?dockerfile=df&nocache=0&t=image1"),

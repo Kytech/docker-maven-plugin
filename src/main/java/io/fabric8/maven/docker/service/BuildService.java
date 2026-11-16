@@ -8,6 +8,7 @@ import io.fabric8.maven.docker.access.DockerAccessException;
 import io.fabric8.maven.docker.assembly.DockerAssemblyManager;
 import io.fabric8.maven.docker.config.AssemblyConfiguration;
 import io.fabric8.maven.docker.config.BuildImageConfiguration;
+import io.fabric8.maven.docker.config.BuildKitMode;
 import io.fabric8.maven.docker.config.CleanupMode;
 import io.fabric8.maven.docker.config.ConfigHelper;
 import io.fabric8.maven.docker.config.ImageConfiguration;
@@ -35,6 +36,11 @@ import java.util.Optional;
 import java.util.regex.PatternSyntaxException;
 
 public class BuildService {
+
+    private static final String BUILDER_VERSION_OPTION = "version";
+    private static final String BUILDKIT_BUILDER_VERSION = "2";
+    private static final String DOCKER_BUILDKIT_ENV = "DOCKER_BUILDKIT";
+
     private final DockerAccess docker;
     private final QueryService queryService;
     private final ArchiveService archiveService;
@@ -183,10 +189,67 @@ public class BuildService {
                         // Labels end up in the generated Dockerfile as LABEL instructions, but a provided
                         // Dockerfile (dockerFile/contextDir mode) is used verbatim, so pass them explicitly.
                         .labels(buildConfig.getLabels());
+        selectBuilder(opts, buildConfig, squash);
         String newImageId = doBuildImage(imageName, dockerArchive, opts);
         log.info("%s: Built image %s", imageConfig.getDescription(), newImageId);
 
         removeDanglingImage(imageName, oldImageId, newImageId, cleanupMode, true);
+    }
+
+    /**
+     * Request BuildKit with the "version=2" build option if the {@code buildkit} configuration asks for it. A builder
+     * which is explicitly selected with the {@code version} build option is left alone.
+     */
+    private void selectBuilder(BuildOptions opts, BuildImageConfiguration buildConfig, boolean squash) throws DockerAccessException {
+        if (!opts.getOptions().containsKey(BUILDER_VERSION_OPTION)
+            && isBuildKitRequested(buildConfig.buildKitMode(), System.getenv(DOCKER_BUILDKIT_ENV), docker, log)) {
+            log.debug("Using the BuildKit builder");
+            opts.version(BUILDKIT_BUILDER_VERSION);
+        }
+        if (BUILDKIT_BUILDER_VERSION.equals(opts.getOptions().get(BUILDER_VERSION_OPTION)) && squash) {
+            log.warn("Squashing the image is not supported by the BuildKit builder, the build is likely to fail");
+        }
+    }
+
+    /**
+     * Decide whether a build sent to the daemon should use BuildKit.
+     *
+     * @param mode the configured mode
+     * @param dockerBuildKitEnv the value of the {@code DOCKER_BUILDKIT} environment variable, null if not set
+     * @param docker used for asking the daemon for its default builder, only done if that is relevant
+     */
+    static boolean isBuildKitRequested(BuildKitMode mode, String dockerBuildKitEnv, DockerAccess docker, Logger log) throws DockerAccessException {
+        switch (mode) {
+            case TRUE:
+                return true;
+            case AUTO:
+                // Same as for "docker build": DOCKER_BUILDKIT wins, else the default builder of the daemon applies
+                Boolean fromEnv = parseBooleanEnv(dockerBuildKitEnv);
+                if (fromEnv != null) {
+                    return fromEnv;
+                }
+                if (dockerBuildKitEnv != null) {
+                    log.warn("Ignoring the invalid value '%s' of %s", dockerBuildKitEnv, DOCKER_BUILDKIT_ENV);
+                }
+                return BUILDKIT_BUILDER_VERSION.equals(docker.getBuilderVersion());
+            default:
+                return false;
+        }
+    }
+
+    // Accepts the same values as Go's strconv.ParseBool, which is what the docker CLI uses for DOCKER_BUILDKIT
+    private static Boolean parseBooleanEnv(String value) {
+        if (value == null) {
+            return null;
+        }
+        switch (value.trim()) {
+            case "1": case "t": case "T": case "true": case "TRUE": case "True":
+                return true;
+            case "0": case "f": case "F": case "false": case "FALSE": case "False":
+                return false;
+            default:
+                return null;
+        }
     }
 
     public void tagImage(String imageName, String tag, String repo, CleanupMode cleanupMode) throws DockerAccessException {
