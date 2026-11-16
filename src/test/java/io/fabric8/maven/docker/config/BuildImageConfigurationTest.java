@@ -53,6 +53,21 @@ class BuildImageConfigurationTest {
     }
 
     @Test
+    void buildKitModeDefaultsToFalse() {
+        Assertions.assertEquals(BuildKitMode.FALSE, new BuildImageConfiguration().buildKitMode());
+    }
+
+    @Test
+    void buildKitModeIsValidated() {
+        BuildImageConfiguration config = new BuildImageConfiguration.Builder().buildkit("auto").build();
+        config.initAndValidate(logger);
+        Assertions.assertEquals(BuildKitMode.AUTO, config.buildKitMode());
+
+        BuildImageConfiguration invalid = new BuildImageConfiguration.Builder().buildkit("sometimes").build();
+        Assertions.assertThrows(IllegalArgumentException.class, () -> invalid.initAndValidate(logger));
+    }
+
+    @Test
     // Tests fix for #1858: a build arg whose value resolves to an empty/undefined property is
     // injected as null and must be normalized to an empty string instead of failing the build
     void buildArgWithNullValueIsNormalizedToEmptyString() {

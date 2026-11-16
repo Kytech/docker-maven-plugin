@@ -52,6 +52,7 @@ public enum ConfigKey {
     BUILDX_CACHE_FROM("buildx.cacheFrom"),
     BUILDX_CACHE_TO("buildx.cacheTo"),
     BUILDX_BUILD_ALL_PLATFORMS("buildx.buildAllPlatforms"),
+    BUILDKIT,
     BUILDX_DRIVER("buildx.driver"),
     BUILDX_DRIVER_OPTS("buildx.driverOpts", ValueCombinePolicy.Merge),
     BUILDX_SECRET_ENVS("buildx.secret.envs", ValueCombinePolicy.Merge),

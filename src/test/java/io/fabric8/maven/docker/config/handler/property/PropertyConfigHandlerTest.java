@@ -19,6 +19,7 @@ package io.fabric8.maven.docker.config.handler.property;
 import io.fabric8.maven.docker.config.Arguments;
 import io.fabric8.maven.docker.config.AssemblyConfiguration;
 import io.fabric8.maven.docker.config.BuildImageConfiguration;
+import io.fabric8.maven.docker.config.BuildKitMode;
 import io.fabric8.maven.docker.config.BuildXConfiguration;
 import io.fabric8.maven.docker.config.CleanupMode;
 import io.fabric8.maven.docker.config.ConfigHelper;
@@ -921,6 +922,24 @@ class PropertyConfigHandlerTest extends AbstractConfigHandlerTest {
 
         ImageConfiguration config = resolveExternalImageConfig(testData);
         Assertions.assertEquals(mode, config.getBuildConfiguration().cleanupMode());
+    }
+
+    @Test
+    void testBuildKitDefault() {
+        String[] testData = new String[] { k(ConfigKey.NAME), "image", k(ConfigKey.FROM), "base" };
+
+        ImageConfiguration config = resolveExternalImageConfig(testData);
+        Assertions.assertNull(config.getBuildConfiguration().getBuildkit());
+        Assertions.assertEquals(BuildKitMode.FALSE, config.getBuildConfiguration().buildKitMode());
+    }
+
+    @Test
+    void testBuildKit() {
+        String[] testData = new String[] { k(ConfigKey.NAME), "image", k(ConfigKey.FROM), "base", k(ConfigKey.BUILDKIT), "auto" };
+
+        ImageConfiguration config = resolveExternalImageConfig(testData);
+        Assertions.assertEquals("auto", config.getBuildConfiguration().getBuildkit());
+        Assertions.assertEquals(BuildKitMode.AUTO, config.getBuildConfiguration().buildKitMode());
     }
 
     @Test

@@ -151,6 +151,7 @@ public class PropertyConfigHandler implements ExternalConfigHandler {
         BuildImageConfiguration.Builder builder = new BuildImageConfiguration.Builder();
         builder.cmd(extractArguments(valueProvider, CMD, config.getCmd()))
             .cleanup(valueProvider.getString(CLEANUP, config.getCleanup()))
+            .buildkit(valueProvider.getString(BUILDKIT, config.getBuildkit()))
             .noCache(valueProvider.getBoolean(NO_CACHE, config.getNoCache()))
             .squash(valueProvider.getBoolean(SQUASH, config.getSquash()))
             .cacheFrom(valueProvider.getList(CACHE_FROM, config.getCacheFrom()))

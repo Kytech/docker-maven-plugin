@@ -152,6 +152,9 @@ public class BuildImageConfiguration implements Serializable {
     private BuildXConfiguration buildx;
 
     @Parameter
+    private String buildkit;
+
+    @Parameter
     private Map<String, String> env;
 
     @Parameter
@@ -391,6 +394,14 @@ public class BuildImageConfiguration implements Serializable {
 
     public CleanupMode cleanupMode() {
         return CleanupMode.parse(cleanup != null ? cleanup : DEFAULT_CLEANUP);
+    }
+
+    public String getBuildkit() {
+        return buildkit;
+    }
+
+    public BuildKitMode buildKitMode() {
+        return BuildKitMode.parse(buildkit);
     }
 
     public boolean noCache() {
@@ -701,6 +712,11 @@ public class BuildImageConfiguration implements Serializable {
             return this;
         }
 
+        public Builder buildkit(String buildkit) {
+            config.buildkit = buildkit;
+            return this;
+        }
+
         public Builder compression(String compression) {
             if (compression == null) {
                 config.compression = ArchiveCompression.none;
@@ -793,6 +809,9 @@ public class BuildImageConfiguration implements Serializable {
         if (healthCheck != null) {
             healthCheck.validate();
         }
+
+        // Fail early on an invalid value
+        buildKitMode();
 
         normalizeBuildArgs();
 
