@@ -82,6 +82,7 @@
     <mockito.version>4.11.0</mockito.version>
     <project.build.outputTimestamp>2026-08-09T15:42:48Z</project.build.outputTimestamp>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <protobuf-javalite.version>3.25.9</protobuf-javalite.version>
     <surefire.version>3.5.3</surefire.version>
     <system-stubs.version>2.0.3</system-stubs.version>
     <version.assertj-core>3.27.7</version.assertj-core>
@@ -131,6 +132,13 @@
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
       <version>${guava.version}</version>
+    </dependency>
+
+    <!-- Only for decoding the progress which BuildKit reports (see BuildKitStatusDecoder) -->
+    <dependency>
+      <groupId>com.google.protobuf</groupId>
+      <artifactId>protobuf-javalite</artifactId>
+      <version>${protobuf-javalite.version}</version>
     </dependency>
 
     <dependency>
