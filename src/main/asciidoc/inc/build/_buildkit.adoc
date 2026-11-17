@@ -1,0 +1,53 @@
+
+By default, an image is built with the classic builder of the Docker daemon. Dockerfile features which need
+https://docs.docker.com/build/buildkit/[BuildKit], like `RUN --mount` (bind, cache, ...), here-documents,
+`COPY --link` or a `# syntax=` line, don't work with it and the build fails with errors like
+`the --mount option requires BuildKit`.
+
+With `<buildkit>`, such a Dockerfile can be built directly through the build API of the Docker daemon, like for any other
+build of this plugin. `docker buildx` is not involved, so nothing besides the Docker daemon has to be installed.
+
+[source,xml]
+----
+<build>
+  <dockerFile>Dockerfile</dockerFile>
+  <buildkit>true</buildkit>
+</build>
+----
+
+The possible values are:
+
+[cols="1,5"]
+|===
+| Value | Meaning
+
+| `false`
+| Always use the classic builder. This is the default.
+
+| `true`
+| Always use BuildKit. (The plugin asks the daemon to do so with the build option `version=2`.)
+
+| `auto`
+| Do what `docker build` on the same machine would do: use BuildKit if the environment variable `DOCKER_BUILDKIT` says so (`1`/`true`)
+  and don't if it says otherwise (`0`/`false`). If that is not set, use BuildKit if it is the default builder of the
+  Docker daemon (as announced by its `Builder-Version` response header, it is since Docker 23.0).
+|===
+
+The property `docker.buildkit` can be used for the setting, too. It has no effect when the image is built with
+<<build-buildx,buildx>>, which uses BuildKit anyway. An explicit build option `version` (see `buildOptions`) is not touched.
+
+When BuildKit is used, the build progress and the output of the build steps are reported like the output of the classic builder is,
+as verbose output (see `docker.verbose`, category `build`). The output of a step which fails is always shown.
+
+.Limitations
+BuildKit gets its session based features (credentials of registries, secrets, SSH agents and a file synchronization of the build
+context) from a client which implements a session with the daemon. This plugin does not do so yet, therefore:
+
+* BuildKit can't authenticate to a registry. So that this doesn't matter, the plugin pulls the images which a
+  Dockerfile needs before the build, with its own authentication (see <<authentication,Authentication>>). These are the base images of
+  all stages (`FROM`) and the images which files are copied from (`COPY --from=<image>`) or mounted from
+  (`RUN --mount=...,from=<image>`). Images which are only referenced in other ways, like by `ONBUILD` instructions, are not pulled.
+  Building with an image of a registry which requires credentials and which was not pulled fails with a
+  message like `failed to resolve source metadata for ...: no active sessions`.
+* `RUN --mount=type=secret` and `type=ssh` can't be used. Use <<build-buildx,buildx>> for this.
+* Squashing the image (`squash`) is not supported by BuildKit.

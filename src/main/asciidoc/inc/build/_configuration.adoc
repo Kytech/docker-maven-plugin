@@ -25,6 +25,9 @@ described in <<build-buildargs,Build Args>>
 https://docs.docker.com/engine/reference/api/docker_remote_api_v1.24/#build-image-from-a-dockerfile[Docker Remote API] and are restricted to simple options
 (e.g.: memory, shmsize). If you use the respective configuration options for build options natively supported by the build configuration (i.e. `squash`, `noCache`, `cleanup=remove` for buildoption `forcerm=1` and `args` for build args) then these will override any corresponding options given here. The key-value syntax is the same as when defining environment variables or labels as described in <<misc-env,Setting Environment Variables and Labels>>.
 
+| *buildkit*
+| Whether the BuildKit builder of the Docker daemon is used to build the image: `false` (default), `true` or `auto`. This is for Dockerfiles which need BuildKit (e.g. `RUN --mount`) and are not built with `buildx`. See <<build-buildkit,BuildKit>>
+
 | *buildx*
 | Specifies the buildx configuration for multi-architecture images. See  <<build-buildx,Buildx Options>>
 

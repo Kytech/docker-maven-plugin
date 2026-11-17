@@ -33,6 +33,11 @@ include::build/_buildargs.adoc[]
 
 include::build/_healthcheck.adoc[]
 
+[[build-buildkit]]
+=== BuildKit
+
+include::build/_buildkit.adoc[]
+
 [[build-buildx]]
 === Multi-Architecture Build
 

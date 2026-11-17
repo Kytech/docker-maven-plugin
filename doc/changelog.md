@@ -4,6 +4,7 @@
   - Do not fail `docker:stop` when the daemon is already removing the container itself, as it does for `<autoRemove>`; a conflict for any other reason (e.g. the container is still running) is still reported
   - Apply `<labels>` when building from a provided Dockerfile (`<dockerFile>`/`<dockerFileDir>`/`<contextDir>`), where they were previously dropped: buildx now receives them as `--label` and the classic build passes them as build options ([#1914](https://github.com/fabric8io/docker-maven-plugin/issues/1914))
   - Do not start the build context archive with a PAX extended header, which made a build with the BuildKit builder (`<buildOptions><version>2</version></buildOptions>`) fail with `dockerfile parse error ... unknown instruction: ./PaxHeaders.X/...` ([#1886](https://github.com/fabric8io/docker-maven-plugin/issues/1886))
+  - Add the `<buildkit>` build option (`false`, `true` or `auto`) to build with the BuildKit builder of the Docker daemon through its build API, without `docker buildx`. This allows Dockerfiles using e.g. `RUN --mount` or here-documents to be built without a dummy `<buildx>` configuration. The images used by `COPY --from=<image>` and `RUN --mount=...,from=<image>` are now pulled, too, and the progress of a BuildKit build is reported ([#1802](https://github.com/fabric8io/docker-maven-plugin/issues/1802))
 
 * **0.49.0 (2026-08-09)**:
   - Fix `docker.save.aliases`: a non-existent alias in the list was silently ignored instead of failing the save with a clear error
