@@ -21,6 +21,9 @@
   <modules>
     <module>build-pom-packaging</module>
     <module>builder</module>
+    <module>buildkit</module>
+    <module>buildkit-auto</module>
+    <module>buildkit-target</module>
     <module>buildx</module>
     <module>buildx-contextdir</module>
     <module>buildx-target</module>
